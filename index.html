@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PCV.NET - Media Server</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background-color: #101010; color: white; font-family: 'Segoe UI', sans-serif; }
+        .jellyfin-gradient { background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(16,16,16,1) 100%); }
+        .sidebar { width: 240px; background: #181818; }
+        .movie-card:hover transform { scale: 1.05; }
+        .restricted-hidden { display: none !important; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+    </style>
+</head>
+<body class="flex overflow-hidden h-screen">
+
+    <!-- Sidebar -->
+    <aside class="sidebar h-full flex flex-col border-r border-gray-800">
+        <div class="p-6 text-2xl font-bold text-blue-500">PCV.NET</div>
+        <nav class="flex-1 px-4 space-y-2">
+            <a href="#" class="block p-3 hover:bg-gray-800 rounded-lg bg-gray-800"><i class="fas fa-home mr-3"></i> Home</a>
+            <div class="text-xs text-gray-500 uppercase mt-6 mb-2 ml-3">Libraries</div>
+            <a href="#" class="block p-3 hover:bg-gray-800 rounded-lg"><i class="fas fa-film mr-3"></i> Hindi Movies</a>
+            <a href="#" class="block p-3 hover:bg-gray-800 rounded-lg"><i class="fas fa-film mr-3"></i> English Movies</a>
+            <a href="#" class="block p-3 hover:bg-gray-800 rounded-lg"><i class="fas fa-film mr-3"></i> Bangla Movies</a>
+            <a href="#" class="block p-3 hover:bg-gray-800 rounded-lg"><i class="fas fa-tv mr-3"></i> Web Series</a>
+        </nav>
+        
+        <!-- Admin-Only Sidebar Items -->
+        <div id="admin-sidebar" class="px-4 pb-6 border-t border-gray-800 pt-4">
+            <a href="#" class="block p-3 hover:bg-gray-800 rounded-lg"><i class="fas fa-cog mr-3"></i> Dashboard</a>
+            <a href="#" class="block p-3 hover:bg-gray-800 rounded-lg"><i class="fas fa-upload mr-3"></i> Upload</a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto relative">
+        <!-- Top Header -->
+        <header class="absolute top-0 w-full z-50 flex justify-end p-6 space-x-4">
+            <i id="settings-icon" class="fas fa-cog text-xl cursor-pointer hover:text-blue-500"></i>
+            <div id="profile-container" class="flex items-center space-x-2 cursor-pointer">
+                <span id="username-display" class="font-medium">User</span>
+                <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                    <i class="fas fa-user text-sm"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero Section (Tailor/Trailer) -->
+        <section class="relative h-[60vh] w-full overflow-hidden">
+            <video id="hero-video" class="absolute top-0 left-0 w-full h-full object-cover opacity-60" autoplay muted loop src=""></video>
+            <div class="absolute inset-0 jellyfin-gradient"></div>
+            <div class="absolute bottom-10 left-10">
+                <h1 id="hero-title" class="text-5xl font-bold mb-2">Featured Movie</h1>
+                <p id="hero-meta" class="text-gray-400 mb-6">2026 • Recently Added</p>
+                <div class="flex space-x-4">
+                    <button class="bg-white text-black px-8 py-3 rounded font-bold flex items-center">
+                        <i class="fas fa-play mr-2"></i> Play
+                    </button>
+                    <button class="bg-gray-600/50 backdrop-blur-md px-8 py-3 rounded font-bold flex items-center">
+                        <i class="fas fa-info-circle mr-2"></i> More Info
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Movie Rows -->
+        <div class="p-10 space-y-10">
+            <section>
+                <h2 class="text-2xl font-semibold mb-4">Recently Added</h2>
+                <div id="movie-grid" class="flex space-x-4 overflow-x-auto pb-4">
+                    <!-- Movies injected here -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Simple Login Modal (For Demo Purposes) -->
+    <div id="login-modal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-[100]">
+        <div class="bg-zinc-900 p-8 rounded-xl border border-gray-800 w-96 text-center">
+            <h2 class="text-2xl font-bold mb-6 text-blue-500">PCV.NET Login</h2>
+            <button onclick="login('Admin')" class="w-full bg-blue-600 p-3 rounded mb-3 hover:bg-blue-700 transition">Login as Admin</button>
+            <button onclick="login('PCV.NET')" class="w-full bg-zinc-700 p-3 rounded hover:bg-zinc-600 transition">Login as PCV.NET User</button>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+
+        async function login(role) {
+            currentUser = role;
+            document.getElementById('login-modal').classList.add('hidden');
+            document.getElementById('username-display').innerText = role;
+            
+            applyRestrictions();
+            loadMovies();
+        }
+
+        function applyRestrictions() {
+            if (currentUser === 'PCV.NET') {
+                // Strict removal of Admin elements
+                document.getElementById('admin-sidebar').remove();
+                document.getElementById('settings-icon').remove();
+                
+                // Disable profile clicking/editing
+                const profile = document.getElementById('profile-container');
+                profile.style.cursor = 'default';
+                profile.onclick = (e) => e.preventDefault();
+            }
+        }
+
+        async function loadMovies() {
+            try {
+                const response = await fetch('/api/movies');
+                const movies = await response.json();
+                const grid = document.getElementById('movie-grid');
+                
+                // Set Hero
+                if(movies.length > 0) {
+                    document.getElementById('hero-video').src = movies[0].trailer;
+                    document.getElementById('hero-title').innerText = movies[0].title;
+                    document.getElementById('hero-meta').innerText = `${movies[0].year} • Recently Added`;
+                }
+
+                grid.innerHTML = movies.map(movie => `
+                    <div class="movie-card min-w-[200px] transition-transform duration-300">
+                        <div class="relative group">
+                            <img src="${movie.poster}" class="rounded-lg shadow-lg w-full h-[300px] object-cover">
+                            <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center space-y-2">
+                                <button class="bg-blue-600 p-2 rounded-full w-12 h-12"><i class="fas fa-play"></i></button>
+                                <a href="${movie.video_url}" download class="text-xs text-gray-300 underline">Download</a>
+                            </div>
+                        </div>
+                        <h3 class="mt-2 font-medium truncate">${movie.title}</h3>
+                        <p class="text-sm text-gray-500">${movie.year}</p>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error("Error loading movies:", err);
+            }
+        }
+    </script>
+</body>
+</html>

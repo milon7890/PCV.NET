@@ -1,0 +1,26 @@
+/* Custom scrollbar for Netflix look */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #141414;
+}
+::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 10px;
+}
+
+/* Movie Card Hover Effect */
+.movie-card {
+    aspect-ratio: 2/3;
+    background-color: #1f1f1f;
+}
+
+#hero {
+    transition: background 1s ease-in-out;
+}
+
+/* Hide admin elements strictly via CSS if needed as backup */
+body.pcv.net-user .admin-only {
+    display: none !important;
+}
